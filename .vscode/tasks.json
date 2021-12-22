@@ -1,0 +1,46 @@
+{
+    "version": "2.0.0",
+    "windows": {
+        "options": {
+          "shell": {
+            "executable": "cmd.exe",
+            "args": [
+              "/C",
+              // The path to VsDevCmd.bat depends on the version of Visual Studio you have installed.
+              "\"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat\"",
+              "&&"
+            ]
+          }
+        }
+      },
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "C/C++: g++.exe Compile program",
+            "command": "cl.exe",
+            "args": [
+                "/Zi",
+                "/std:c++17",
+                "/EHsc",
+                "/I",
+                "${workspaceFolder}\\inv",
+                "/I",
+                "${workspaceFolder}\\etl\\include",
+                "/Fe:",
+                "${workspaceFolder}\\test.exe",
+                "${workspaceFolder}\\Test.cpp"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Vom Debugger generierte Aufgabe."
+        }
+    ]
+}
