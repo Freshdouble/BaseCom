@@ -1,8 +1,9 @@
 #include <tuple>
 #include <type_traits>
+#include "bitfield.hpp"
 
-#ifndef TUPLE_HELPER_HPP__
-#define TUPLE_HELPER_HPP__
+#ifndef HELPER_HPP__
+#define HELPER_HPP__
 
 namespace translib
 {
@@ -32,9 +33,9 @@ namespace translib
 
         /**
          * @brief tuple_contains_type::value will return true if the tuple contains the type.
-         * 
-         * @tparam T 
-         * @tparam Tuple 
+         *
+         * @tparam T
+         * @tparam Tuple
          */
         template <typename T, typename Tuple>
         using tuple_contains_type = typename has_type<T, Tuple>::type;

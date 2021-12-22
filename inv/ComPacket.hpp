@@ -1,7 +1,7 @@
 #include <tuple>
 #include <string>
 #include <type_traits>
-#include "tuple_helper.hpp"
+#include "helper.hpp"
 #include <array>
 #include "bitfield.hpp"
 
@@ -53,15 +53,15 @@ namespace translib
          *
          * This function calculates the serialized length of the class in the current state.
          *
-         * @tparam type
+         * @tparam T
          * @param instance
          * @return constexpr size_t
          */
-        template <typename type>
-        inline constexpr size_t getSerializedLength(const type &instance)
+        template <typename T>
+        inline constexpr typename std::enable_if<is_arithmetic_v<remove_reference_t<T>>, size_t>::type
+        getSerializedLength(const T &instance)
         {
-            static_assert(!is_same<type, string>::value, "Compiler tries to use is size of on non supported type");
-            return sizeof(type);
+            return sizeof(T);
         }
 
         /**
@@ -74,8 +74,7 @@ namespace translib
          * @param instance
          * @return size_t
          */
-        template <>
-        inline size_t getSerializedLength<string>(const string &instance)
+        inline size_t getSerializedLength(const string &instance)
         {
             return instance.length() + 1;
         }
@@ -171,9 +170,10 @@ namespace translib
          * @param tocopy - Max bytes to serialize from the object to the buffer.
          * @return iterator
          */
-        template <typename type, typename iterator>
-        static inline iterator serializeToBuffer(const type *data, iterator &it, const iterator &end, size_t tocopy)
+        template <typename T, typename iterator>
+        static inline iterator serializeToBuffer(const T *data, iterator &it, const iterator &end, size_t tocopy)
         {
+            static_assert(is_arithmetic_v<remove_reference_t<T>>);
             tocopy = min<size_t>(tocopy, distance(it, end));
             memcpy(&(*it), data, tocopy);
             advance(it, tocopy);
@@ -190,8 +190,9 @@ namespace translib
          * @param end - end iterator marking the end of the output buffer.
          * @return iterator
          */
-        template <typename type, typename iterator>
-        static inline iterator serializeToBuffer(const type &data, iterator &it, const iterator &end)
+        template <typename T, typename iterator>
+        static inline constexpr typename std::enable_if<is_arithmetic_v<remove_reference_t<T>>, iterator>::type
+        serializeToBuffer(const T &data, iterator &it, const iterator &end)
         {
             size_t typelength = min<size_t>(getSerializedLength(data), distance(it, end));
             return serializeToBuffer(&data, it, end, typelength);
@@ -252,6 +253,7 @@ namespace translib
         static inline iterator serializeToBuffer(const Bitfield<bitlength> &data, iterator &it, const iterator &end)
         {
             data.BuildPacket(it, end);
+            return it;
         }
 
         /***************************************Unserialize message from buffer********************************/
@@ -268,11 +270,11 @@ namespace translib
          * @param valid - Reference value is set to true if the data in element is considered valid. This is true if there are at least enough bytes in the buffer to fully fill the element.
          * @return size_t
          */
-        template <typename type>
-        static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, type &element, bool &valid)
+        template <typename T>
+        static inline constexpr typename std::enable_if<is_arithmetic_v<remove_reference_t<T>>, size_t>::type
+        deserializeFromBuffer(const uint8_t *data, const size_t length, T &element, bool &valid)
         {
             auto byte_size = getSerializedLength(element);
-            static_assert(!std::is_same<type, std::string>::value);
             if (length >= byte_size)
             {
                 memcpy(&element, data, byte_size);
@@ -280,7 +282,7 @@ namespace translib
             }
             else
             {
-                valid = false;
+                valid &= false;
                 return length;
             }
         }
@@ -290,19 +292,21 @@ namespace translib
          *
          * This function is to deserialize data to std::string.
          *
-         * @tparam
          * @param data - Buffer with serialzed data.
          * @param length - Number of bytes in the buffer.
          * @param element - The string to unserialize the data to.
          * @param valid - Reference value is set to true if the data in element is considered valid. This is true if there are at least enough bytes in the buffer to fully fill the element.
          * @return size_t
          */
-        template <>
-        size_t inline deserializeFromBuffer<string>(const uint8_t *data, const size_t length, string &element, bool &valid)
+        static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, string &element, bool &valid)
         {
             (void)valid;
             size_t stringlength = strlen_s(reinterpret_cast<const char *>(data), length);
             element = string(reinterpret_cast<const char *>(data), stringlength);
+            if(stringlength < length) //If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
+            {
+                stringlength++; //If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
+            }
             return stringlength;
         }
 
@@ -325,6 +329,10 @@ namespace translib
             (void)valid;
             size_t stringlength = min<size_t>(strlen_s(reinterpret_cast<const char *>(data), length), MAX_SIZE_);
             element = etl::string<MAX_SIZE_>(reinterpret_cast<const char *>(data), stringlength);
+            if(stringlength < length) //If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
+            {
+                stringlength++; //If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
+            }
             return stringlength;
         }
 #endif
@@ -344,8 +352,7 @@ namespace translib
         template <const size_t bitlength>
         static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, Bitfield<bitlength> &element, bool &valid)
         {
-            size_t ret = element.ParseData(data, length);
-            valid = ret == length;
+            size_t ret = element.ParseData(data, length, valid);
             return ret;
         }
     }
@@ -546,7 +553,7 @@ namespace translib
                   { ((utils::serializeToBuffer(args, start, end)), ...); },
                   elements);
 
-            return distance(start, begin);
+            return distance(begin, start);
         }
     };
 }

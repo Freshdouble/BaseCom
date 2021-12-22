@@ -1,13 +1,15 @@
 # BASECOM Library
 
-**This is a library in progress, so not every feature is tested and there are known issues at the time. Bitfields wouldn't work right know but those issues will be addressed in the future**
-
 The bascom library is a header only C++ library to define datapackets as well as serialize and deserialize them.
 It is intended for an easy straight forward definition of telemetry packets in C++.
 
 The intended use of this library is to receive and transmit data to and from an embedded system. The library would not use dynamic memory allocation and the function would not throw any exceptions.
 
 The only part of the library that would use dynamic memory allocation is the use of std::string in the packets.  A supplement for std::string is etl::string of the embedded template library that is provided in the etl subrepository.
+
+## Disclaimer
+
+This is a library in progress, so not every feature is tested yet.
 
 ## Supported C++ version
 

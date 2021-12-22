@@ -30,10 +30,10 @@ struct TestBitfield : public Bitfield<1> // Should always allocate one instance 
 
 struct LargeBitField : public Bitfield<70> // Should always allocate at least two instances of the backing data type
 {
-    static const size_t TestBit1_Offset = 10;
+    static const size_t TestBit1_Offset = 0;
     static const size_t TestBit1_Length = 5;
-    static const size_t TestBit2_Offset = 15;
-    static const size_t TestBit2_Length = 5;
+    static const size_t TestBit2_Offset = 13;
+    static const size_t TestBit2_Length = 3;
 
     uint8_t ReadTestBit1()
     {
@@ -54,7 +54,7 @@ struct LargeBitField : public Bitfield<70> // Should always allocate at least tw
     }
 };
 
-struct MixedDataMessage : public ComPacket<int, etl::string<10>, TestBitfield, LargeBitField>
+struct MixedDataMessage : public ComPacket<int32_t, etl::string<10>, TestBitfield, LargeBitField>
 {
     int &Testfield1 = get<0>(elements);
     etl::string<10> &Testfield2 = get<1>(elements);
@@ -88,15 +88,22 @@ int main(void)
     mixed.Testfield3.WriteTestBit(1);
 
     std::array<uint8_t, mixed.GetMaxSize()> dataarray;
-    mixed.Serialze(dataarray);
+    size_t packageLength = mixed.Serialze(dataarray);
+
+    assert(packageLength == (sizeof(int) + (mixed.Testfield2.size() + 1) + TestBitfield::BYTE_LENGTH + LargeBitField::BYTE_LENGTH));
 
     MixedDataMessage deserializeTest;
     size_t usedData;
     bool valid;
-    std::tie(usedData, valid) = MixedDataMessage::Unserialize(dataarray.data(), dataarray.size(), deserializeTest);
+    std::tie(usedData, valid) = MixedDataMessage::Unserialize(dataarray.data(), packageLength, deserializeTest);
+    assert(valid);
     assert(deserializeTest.Testfield1 == -10);
     assert(deserializeTest.Testfield2 == teststring);
     assert(deserializeTest.Testfield3.ReadTestBit() == 1);
+
+    uint8_t falseData[] = {10,10,20,20,30,30};
+    std::tie(usedData, valid) = MixedDataMessage::Unserialize(falseData, sizeof(falseData), deserializeTest);
+    assert(!valid);
 
     return 0;
 }
