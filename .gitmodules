@@ -1,0 +1,6 @@
+[submodule "etl"]
+	path = etl
+	url = https://github.com/ETLCPP/etl.git
+[submodule "libsmp"]
+	path = libsmp
+	url = git@github.com:Freshdouble/libsmp.git
