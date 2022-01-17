@@ -107,7 +107,7 @@ namespace translib
          * @param instance
          * @return constexpr size_t
          */
-        template <int bitlength>
+        template <const size_t bitlength>
         inline constexpr size_t getSerializedLength(const Bitfield<bitlength> &instance)
         {
             return instance.GetByteLength();

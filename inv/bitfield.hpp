@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 
 #ifndef BITFIELD_HPP__
 #define BITFIELD_HPP__
@@ -138,7 +139,7 @@ namespace translib
         size_t BuildPacket(iterator &start, const iterator &end) const
         {
             size_t length = min<size_t>(sizeof(storage), distance(start, end));
-            memcpy(&(*start), storage, length);
+            std::memcpy(&(*start), storage, length);
             advance(start, length);
             return length;
         }
@@ -158,7 +159,7 @@ namespace translib
                 valid &= false;
                 bytestowrite = length;
             }
-            memcpy(storage, data, bytestowrite);
+            std::memcpy(storage, data, bytestowrite);
             return bytestowrite;
         }
 
