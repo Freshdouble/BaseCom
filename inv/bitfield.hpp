@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cassert>
+#include <cstdint>
 
 #ifndef BITFIELD_HPP__
 #define BITFIELD_HPP__
@@ -87,7 +88,14 @@ namespace translib
             backingtype mask;
             size_t shift = 0;
             mask = CalculateBitMask(bitstart, datalength, shift);
-            return (T)((rawdata & mask) >> shift);
+            if constexpr (std::is_same<T, bool>::value)
+            {
+                return ((rawdata & mask) >> shift) != 0;
+            }
+            else
+            {
+                return static_cast<T>((rawdata & mask) >> shift);
+            }
         }
 
         /**
@@ -105,7 +113,15 @@ namespace translib
             backingtype mask;
             size_t shift = 0;
             mask = CalculateBitMask(bitstart, datalength, shift);
-            T maskedData = data & (mask >> shift);
+            T maskedData;
+            if constexpr (std::is_same<T, bool>::value)
+            {
+                maskedData = (data ? 1 : 0) & (mask >> shift);
+            }
+            else
+            {
+                maskedData = data & (mask >> shift);
+            }
             storage[GetStorageLocationForBit(bitstart)] &= ~mask;               // Clear all bits within this area
             storage[GetStorageLocationForBit(bitstart)] |= maskedData << shift; // Set bits with new data
         }

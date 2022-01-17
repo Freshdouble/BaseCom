@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <tuple>
 #include <string>
 #include <type_traits>
@@ -400,7 +401,7 @@ namespace translib
          *
          * @return constexpr size_t
          */
-        static constexpr inline size_t GetMaxSize()
+        static constexpr size_t GetMaxSize()
         {
             if constexpr (SupportsMaxSize)
             {
@@ -421,24 +422,99 @@ namespace translib
         }
 
         /**
-         * @brief Serialize the packet to the buffer starting at begin and ending on end
-         *
-         * @tparam length
-         * @param buffer - The array to hold the data
-         * @return true on sucess false otherwise. This function will return false if the buffer is to small to hold the whole packet.
+         * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
+         * 
+         * @tparam datalength 
+         * @tparam idlength 
+         * @param buffer 
+         * @param idbytes 
+         * @return size_t 
          */
-        template <const size_t length>
-        size_t Serialze(array<uint8_t, length> &buffer) const
+        template <const size_t datalength, const size_t idlength>
+        size_t Serialize(array<uint8_t, datalength> &buffer, const array<uint8_t, idlength> &idbytes) const
         {
-            return Serialze(buffer.begin(), buffer.end());
-        }
+            if constexpr (SupportsMaxSize)
+            {
+                static_assert(datalength >= (idlength + GetMaxSize()), "The output buffer must be large enough to contain the whole packet");
+            }
+            else
+            {
+                static_assert(datalength >= idlength, "The output buffer must be large enough to contain atleast the id");
+            }
+            auto it = copy(idbytes.begin(), idbytes.end(), buffer.begin());
+            return Serialize(it, buffer.end()) + idlength;
+        }        
 
 #ifdef USE_MEMALLOC
-        size_t Serialze(vector<uint8_t> &buffer) const
+        /**
+         * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
+         * 
+         * @tparam idlength 
+         * @param buffer 
+         * @param idbytes 
+         * @return size_t 
+         */
+        template <const size_t idlength>
+        size_t Serialize(vector<uint8_t> &buffer, const array<uint8_t, idlength> &idbytes) const
         {
-            return Serialze(buffer.begin(), buffer.end());
+            if constexpr (SupportsMaxSize)
+            {
+                buffer.reserve(idlength + GetMaxSize());
+            }
+            else
+            {
+                buffer.reserve(idlength + GetSerializedLength());
+            }
+            auto it = copy(idbytes.begin(), idbytes.end(), buffer.begin());
+            return Serialize(it, buffer.end());
+        }
+
+        /**
+         * @brief Serialize the packet to an newly created vector with the specified id data before the serialized data.
+         * 
+         * @tparam idlength 
+         * @param idbytes 
+         * @return unique_ptr<vector<uint8_t>> 
+         */
+        template <const size_t idlength>
+        unique_ptr<vector<uint8_t>> Serialize(const array<uint8_t, idlength> &idbytes) const
+        {
+            unique_ptr<vector<uin8_t>> ret = new vector<uint8_t>(idlength + GetSerializedLength());
+            auto it = copy(idbytes.begin(), idbytes.end(), ret.begin());
+            Serialize(it, ret.end());
+            return ret;
         }
 #endif
+
+        /**
+         * @brief Check if the id data at the packet start matches with the provided id.
+         * 
+         * @tparam arraylength 
+         * @param data 
+         * @param datalength 
+         * @param idbytes 
+         * @return tuple<bool, uint8_t*, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
+         */
+        template<const size_t arraylength>
+        static tuple<bool,const uint8_t*, size_t> CheckIDMatch(const uint8_t* data, size_t datalength,const array<uint8_t, arraylength>& idbytes)
+        {
+            if(datalength < arraylength)
+            {
+                return make_tuple(false, nullptr, 0);
+            }
+            bool ret = true;
+            //Check if data starts with idbytes
+            size_t i;
+            for(i = 0; i < arraylength; i++)
+            {
+                if(idbytes[i] != data[i])
+                {
+                    ret = false;
+                    break;
+                }
+            }
+            return make_tuple(ret, &data[i], static_cast<size_t>(datalength - i));
+        }
 
         /**
          * @brief Deserialize data from the buffer.
@@ -486,31 +562,6 @@ namespace translib
             return make_tuple(offset, valid);
         }
 
-        /**
-         * @brief Sends the data using a functor.
-         *
-         * This function causes the object to serialize itself and passes the data to the functor
-         *
-         * @tparam sendfunctor - The functor to use to send the serialized data.
-         * @param send
-         */
-        template <typename sendfunctor>
-        void SendData(sendfunctor &send) const
-        {
-            if constexpr (SupportsMaxSize)
-            {
-                array<uint8_t, GetMaxSize()> data;
-                Serialze(data.begin(), data.end());
-                send(data.begin(), data.end());
-            }
-            else
-            {
-                vector<uint8_t> data;
-                Serialze(data.begin(), data.end());
-                send(data.begin(), data.end());
-            }
-        }
-
     protected:
         /**
          * @brief tuple that holds the data of the object.
@@ -538,7 +589,7 @@ namespace translib
          * @return true on sucess false otherwise. This function will return false if the buffer is to small to hold the whole packet.
          */
         template <typename iterator>
-        size_t Serialze(const iterator& begin, const iterator& end) const
+        size_t Serialize(const iterator& begin, const iterator& end) const
         {
             const size_t packetLength = GetSerializedLength();
             const size_t iteratorLength = distance(begin, end);

@@ -87,15 +87,23 @@ int main(void)
     mixed.Testfield2 = teststring;
     mixed.Testfield3.WriteTestBit(1);
 
-    std::array<uint8_t, mixed.GetMaxSize()> dataarray;
-    size_t packageLength = mixed.Serialze(dataarray);
+    std::array<uint8_t, 2> id = {2,3};
 
-    assert(packageLength == (sizeof(int) + (mixed.Testfield2.size() + 1) + TestBitfield::BYTE_LENGTH + LargeBitField::BYTE_LENGTH));
+    std::array<uint8_t, mixed.GetMaxSize() + sizeof(id)> dataarray;
+    size_t packageLength = mixed.Serialize(dataarray, id);
+
+    assert(packageLength == (sizeof(int) + (mixed.Testfield2.size() + 1) + TestBitfield::BYTE_LENGTH + LargeBitField::BYTE_LENGTH + sizeof(id)));
 
     MixedDataMessage deserializeTest;
     size_t usedData;
     bool valid;
-    std::tie(usedData, valid) = MixedDataMessage::Unserialize(dataarray.data(), packageLength, deserializeTest);
+
+    size_t datalength;
+    const uint8_t* packetStart;
+    std::tie(valid, packetStart, datalength) = MixedDataMessage::CheckIDMatch(dataarray.data(), packageLength, id);
+    assert(valid);
+
+    std::tie(usedData, valid) = MixedDataMessage::Unserialize(packetStart, datalength, deserializeTest);
     assert(valid);
     assert(deserializeTest.Testfield1 == -10);
     assert(deserializeTest.Testfield2 == teststring);
