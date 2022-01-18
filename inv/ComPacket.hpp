@@ -175,7 +175,9 @@ namespace translib
         static inline iterator serializeToBuffer(const T *data, iterator &it, const iterator &end, size_t tocopy)
         {
             static_assert(is_arithmetic_v<remove_reference_t<T>>);
-            tocopy = min<size_t>(tocopy, distance(it, end));
+            auto dist = distance(it, end);
+            assert(dist >= 0);
+            tocopy = min<size_t>(tocopy, dist);
             memcpy(&(*it), data, tocopy);
             advance(it, tocopy);
             return it;
@@ -195,7 +197,9 @@ namespace translib
         static inline constexpr typename std::enable_if<is_arithmetic_v<remove_reference_t<T>>, iterator>::type
         serializeToBuffer(const T &data, iterator &it, const iterator &end)
         {
-            size_t typelength = min<size_t>(getSerializedLength(data), distance(it, end));
+        	auto dist = distance(it, end);
+        	assert(dist >= 0);
+            size_t typelength = min<size_t>(getSerializedLength(data), dist);
             return serializeToBuffer(&data, it, end, typelength);
         }
 
@@ -211,7 +215,9 @@ namespace translib
         template <typename iterator>
         inline iterator serializeToBuffer(const string &data, iterator &it, const iterator &end)
         {
-            size_t typelength = min<size_t>(getSerializedLength(data), distance(it, end));
+        	auto dist = distance(it, end);
+        	assert(dist >= 0);
+            size_t typelength = min<size_t>(getSerializedLength(data), dist);
             it = serializeToBuffer(data.c_str(), it, end, typelength - 1);
             *it = 0;
             it++;
@@ -232,7 +238,9 @@ namespace translib
         template <const size_t MAX_SIZE_, typename iterator>
         inline iterator serializeToBuffer(const etl::string<MAX_SIZE_> &data, iterator &it, const iterator &end)
         {
-            size_t typelength = min<size_t>(getSerializedLength(data), distance(it, end));
+        	auto dist = distance(it, end);
+        	assert(dist >= 0);
+            size_t typelength = min<size_t>(getSerializedLength(data), dist);
             it = serializeToBuffer(data.c_str(), it, end, typelength - 1);
             *it = 0;
             it++;
@@ -304,9 +312,9 @@ namespace translib
             (void)valid;
             size_t stringlength = strlen_s(reinterpret_cast<const char *>(data), length);
             element = string(reinterpret_cast<const char *>(data), stringlength);
-            if(stringlength < length) //If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
+            if (stringlength < length) // If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
             {
-                stringlength++; //If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
+                stringlength++; // If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
             }
             return stringlength;
         }
@@ -330,9 +338,9 @@ namespace translib
             (void)valid;
             size_t stringlength = min<size_t>(strlen_s(reinterpret_cast<const char *>(data), length), MAX_SIZE_);
             element = etl::string<MAX_SIZE_>(reinterpret_cast<const char *>(data), stringlength);
-            if(stringlength < length) //If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
+            if (stringlength < length) // If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
             {
-                stringlength++; //If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
+                stringlength++; // If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
             }
             return stringlength;
         }
@@ -423,12 +431,12 @@ namespace translib
 
         /**
          * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
-         * 
-         * @tparam datalength 
-         * @tparam idlength 
-         * @param buffer 
-         * @param idbytes 
-         * @return size_t 
+         *
+         * @tparam datalength
+         * @tparam idlength
+         * @param buffer
+         * @param idbytes
+         * @return size_t
          */
         template <const size_t datalength, const size_t idlength>
         size_t Serialize(array<uint8_t, datalength> &buffer, const array<uint8_t, idlength> &idbytes) const
@@ -443,16 +451,16 @@ namespace translib
             }
             auto it = copy(idbytes.begin(), idbytes.end(), buffer.begin());
             return Serialize(it, buffer.end()) + idlength;
-        }        
+        }
 
 #ifdef USE_MEMALLOC
         /**
          * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
-         * 
-         * @tparam idlength 
-         * @param buffer 
-         * @param idbytes 
-         * @return size_t 
+         *
+         * @tparam idlength
+         * @param buffer
+         * @param idbytes
+         * @return size_t
          */
         template <const size_t idlength>
         size_t Serialize(vector<uint8_t> &buffer, const array<uint8_t, idlength> &idbytes) const
@@ -471,10 +479,10 @@ namespace translib
 
         /**
          * @brief Serialize the packet to an newly created vector with the specified id data before the serialized data.
-         * 
-         * @tparam idlength 
-         * @param idbytes 
-         * @return unique_ptr<vector<uint8_t>> 
+         *
+         * @tparam idlength
+         * @param idbytes
+         * @return unique_ptr<vector<uint8_t>>
          */
         template <const size_t idlength>
         unique_ptr<vector<uint8_t>> Serialize(const array<uint8_t, idlength> &idbytes) const
@@ -488,78 +496,114 @@ namespace translib
 
         /**
          * @brief Check if the id data at the packet start matches with the provided id.
-         * 
-         * @tparam arraylength 
-         * @param data 
-         * @param datalength 
-         * @param idbytes 
-         * @return tuple<bool, uint8_t*, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
+         *
+         * @tparam datalength
+         * @tparam arraylength
+         *  @param data
+         *  @param length
+         *  @param idbytes
+         *  @return tuple<bool, iterator, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
          */
-        template<const size_t arraylength>
-        static tuple<bool,const uint8_t*, size_t> CheckIDMatch(const uint8_t* data, size_t datalength,const array<uint8_t, arraylength>& idbytes)
+        template <const size_t datalength, const size_t arraylength>
+        static tuple<bool, typename array<uint8_t, datalength>::const_iterator, size_t> CheckIDMatch(const std::array<uint8_t, datalength> &data, size_t length, const array<uint8_t, arraylength> &idbytes)
         {
-            if(datalength < arraylength)
+            assert(length <= datalength);
+            if (length <= datalength)
             {
-                return make_tuple(false, nullptr, 0);
-            }
-            bool ret = true;
-            //Check if data starts with idbytes
-            size_t i;
-            for(i = 0; i < arraylength; i++)
-            {
-                if(idbytes[i] != data[i])
+                auto [valid, dataptr, remainingbytes] = CheckIDMatch(data.data(), length, idbytes);
+                auto readbytes = length - remainingbytes;
+                assert(readbytes <= datalength);
+                if (valid)
                 {
-                    ret = false;
-                    break;
+                    return make_tuple(true, data.begin() + readbytes, remainingbytes);
                 }
             }
-            return make_tuple(ret, &data[i], static_cast<size_t>(datalength - i));
+            return make_tuple(false, data.begin(), 0);
         }
 
         /**
          * @brief Deserialize data from the buffer.
          *
-         * This function deserializes the data and returns them as tuple. The tuple has the same structure as this data packet.
-         *
-         * @param data - The buffer that holds the data.
-         * @param length - The length of the buffer.
-         * @return tuple that:
-         *              -holds the amount of bytes that where read from the buffer.
-         *              -a bool if the unserialized packet is valid. This is true if the amount of data in the buffer is at least the minimal length of the bytes in this packet
-         *              -a tuple that holds the deserialized values
-         */
-        static auto Unserialize(const uint8_t *data, size_t length)
-        {
-            auto parsed_elements = tupletype();
-            size_t offset = 0;
-            bool valid = apply([&offset, &data, length](auto &&...args)
-                               {
-                                                 bool valid = true;
-                                                 ((offset += utils::deserializeFromBuffer(&data[offset], length - offset, args, valid)), ...);
-                                                 return valid; },
-                               parsed_elements);
-            return make_tuple(offset, valid, parsed_elements);
-        }
-
-        /**
-         * @brief Deserialize data from the buffer.
-         *
-         * @param data - The buffer that holds the data.
+         * @tparam maxdatalength
+         * @param it - Start of the data.
+         * @param end - End of the array.
          * @param length - The length of the buffer.
          * @param packet - The packet the data should be unserialized to.
+         * @return a tuple which holds the number of read bytes as a size_t, a boolean that marks if the deserialized data could be valid and an iterator past the packet.
+         */
+        template <const size_t maxdatalength>
+        static auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it, const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length, ComPacket<T...> &packet)
+        {
+            assert(length <= maxdatalength);
+            auto dist = std::distance(it, end);
+            assert(dist >= 0);
+            assert(length <= static_cast<size_t>(dist));
+            if (length <= maxdatalength && length <= static_cast<size_t>(dist))
+            {
+
+                auto parsed_elements = tupletype();
+                size_t offset = 0;
+                const uint8_t* data = &(*it);
+                bool valid = apply([&offset, &data, length](auto &&...args)
+                                   {
+                                                         bool valid = true;
+                                                         ((offset += utils::deserializeFromBuffer(&data[offset], length - offset, args, valid)), ...);
+                                                         return valid; },
+                                   parsed_elements);
+                if(valid)
+                {
+                    packet.elements = parsed_elements;
+                }
+                return make_tuple(offset, valid, it + offset);
+            }
+            else
+            {
+                return make_tuple(0U, false, it);
+            }
+        }
+
+        /**
+         * @brief Deserialize data from the buffer.
+         * 
+         * @tparam maxdatalength 
+         * @param data 
+         * @param length 
+         * @param packet 
+         * @return a tuple which holds the number of read bytes as a size_t, a boolean that marks if the deserialized data could be valid and an iterator past the packet.
+         */
+        template <const size_t maxdatalength>
+        static auto Unserialize(std::array<uint8_t, maxdatalength> &data, size_t length, ComPacket<T...> &packet)
+        {
+            return Unserialize<maxdatalength>(data.begin(), data.end(), length, packet);
+        }
+
+        /**
+         * @brief Deserialize data from the buffer to this instance
+         *
+         * @tparam maxdatalength
+         * @param it - Start of the data.
+         * @param end - End of the array.
+         * @param length - The length of the buffer.
          * @return a tuple which holds the number of read bytes as a size_t and a boolean that marks if the deserialized data could be valid.
          */
-        static auto Unserialize(const uint8_t *data, size_t length, ComPacket<T...> &packet)
+        template <const size_t maxdatalength>
+        auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it, const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length)
         {
-            size_t offset;
-            bool valid;
-            tupletype parsed_elements;
-            tie(offset, valid, parsed_elements) = Unserialize(data, length);
-            if (valid)
-            {
-                packet.SetElements(parsed_elements);
-            }
-            return make_tuple(offset, valid);
+            return Unserialize<maxdatalength>(it, end, length, *this);
+        }
+
+        /**
+         * @brief Deserialize data from the buffer to this instance
+         *
+         * @tparam maxdatalength
+         * @param data - The array holding the data
+         * @param length - The length of the buffer.
+         * @return a tuple which holds the number of read bytes as a size_t and a boolean that marks if the deserialized data could be valid.
+         */
+        template <const size_t maxdatalength>
+        auto Unserialize(const std::array<uint8_t, maxdatalength> &data, size_t length)
+        {
+            return Unserialize(data.begin(), data.end(), length, *this);
         }
 
     protected:
@@ -568,6 +612,36 @@ namespace translib
          *
          */
         tupletype elements;
+
+        /**
+         * @brief Check if the id data at the packet start matches with the provided id.
+         *
+         * @tparam arraylength
+         * @param data
+         * @param datalength
+         * @param idbytes
+         * @return tuple<bool, uint8_t*, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
+         */
+        template <const size_t arraylength>
+        static tuple<bool, const uint8_t *, size_t> CheckIDMatch(const uint8_t *data, size_t datalength, const array<uint8_t, arraylength> &idbytes)
+        {
+            if (datalength < arraylength)
+            {
+                return make_tuple(false, nullptr, 0);
+            }
+            bool ret = true;
+            // Check if data starts with idbytes
+            size_t i;
+            for (i = 0; i < arraylength; i++)
+            {
+                if (idbytes[i] != data[i])
+                {
+                    ret = false;
+                    break;
+                }
+            }
+            return make_tuple(ret, &data[i], static_cast<size_t>(datalength - i));
+        }
 
     private:
         /**
@@ -589,11 +663,12 @@ namespace translib
          * @return true on sucess false otherwise. This function will return false if the buffer is to small to hold the whole packet.
          */
         template <typename iterator>
-        size_t Serialize(const iterator& begin, const iterator& end) const
+        size_t Serialize(const iterator &begin, const iterator &end) const
         {
             const size_t packetLength = GetSerializedLength();
-            const size_t iteratorLength = distance(begin, end);
-            if (packetLength > iteratorLength)
+            const auto iteratorLength = distance(begin, end);
+            assert(iteratorLength >= 0);
+            if (iteratorLength < 0 || packetLength > static_cast<size_t>(iteratorLength))
             {
                 return 0;
             }
@@ -604,7 +679,9 @@ namespace translib
                   { ((utils::serializeToBuffer(args, start, end)), ...); },
                   elements);
 
-            return distance(begin, start);
+            auto ret = distance(begin, start);
+            assert(ret >= 0);
+            return ret;
         }
     };
 }
