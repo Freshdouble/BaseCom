@@ -96,21 +96,19 @@ int main(void)
 
     MixedDataMessage deserializeTest;
     size_t usedData;
-    bool valid;
-
-    size_t datalength;
-    const uint8_t* packetStart;
-    std::tie(valid, packetStart, datalength) = MixedDataMessage::CheckIDMatch(dataarray.data(), packageLength, id);
+    auto [valid, packetStart, datalength] = MixedDataMessage::CheckIDMatch(dataarray, packageLength, id);
     assert(valid);
 
-    std::tie(usedData, valid) = MixedDataMessage::Unserialize(packetStart, datalength, deserializeTest);
+    typename std::array<uint8_t, mixed.GetMaxSize() + sizeof(id)>::const_iterator it;
+    std::tie(usedData, valid, it) = deserializeTest.Unserialize<dataarray.max_size()>(packetStart, dataarray.end(), datalength);
     assert(valid);
     assert(deserializeTest.Testfield1 == -10);
     assert(deserializeTest.Testfield2 == teststring);
     assert(deserializeTest.Testfield3.ReadTestBit() == 1);
 
-    uint8_t falseData[] = {10,10,20,20,30,30};
-    std::tie(usedData, valid) = MixedDataMessage::Unserialize(falseData, sizeof(falseData), deserializeTest);
+    std::array<uint8_t, 6> falseData = {10,10,20,20,30,30};
+    decltype(falseData.cbegin()) falseIterator;
+    std::tie(usedData, valid, falseIterator) = MixedDataMessage::Unserialize<falseData.max_size()>(falseData, falseData.max_size(), deserializeTest);
     assert(!valid);
 
     return 0;
