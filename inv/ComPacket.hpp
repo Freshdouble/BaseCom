@@ -80,6 +80,17 @@ namespace translib
             return instance.length() + 1;
         }
 
+        template<typename T, size_t length>
+        inline constexpr size_t getSerializedLength(const std::array<T, length>& data)
+        {
+            size_t sum = 0;
+            for(const auto& d : data)
+            {
+                sum += getSerializedLength(d);
+            }
+            return sum;
+        }
+
 #ifdef USE_ETL
         /**
          * @brief Return the bytesize of the serialized packet.
@@ -133,6 +144,12 @@ namespace translib
         struct max_size<Bitfield<bitlength>>
         {
             static const size_t value = Bitfield<bitlength>::BYTE_LENGTH;
+        };
+
+        template<typename T, size_t length>
+        struct max_size<std::array<T, length>>
+        {
+            static const size_t value = max_size<T>::value * length;
         };
 
 #ifdef USE_ETL
@@ -221,6 +238,16 @@ namespace translib
             it = serializeToBuffer(data.c_str(), it, end, typelength - 1);
             *it = 0;
             it++;
+            return it;
+        }
+
+        template<typename arraytype, size_t length, typename iterator>
+        inline iterator serializeToBuffer(const std::array<arraytype, length> &data, iterator &it, const iterator &end)
+        {
+            for(size_t i = 0; i < length; i++)
+            {
+                it = serializeToBuffer(data[i], it, end);
+            }
             return it;
         }
 
@@ -317,6 +344,26 @@ namespace translib
                 stringlength++; // If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
             }
             return stringlength;
+        }
+
+        template<typename T, size_t arraylength>
+        static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, std::array<T, arraylength> &element, bool &valid)
+        {
+            auto byte_size = getSerializedLength(element);
+            size_t readbytes = 0;
+            if (length >= byte_size)
+            {
+                for(size_t i = 0; i < arraylength; i++)
+                {
+                    readbytes += deserializeFromBuffer(&data[readbytes], length - readbytes, element[i], valid);
+                }
+                return readbytes;
+            }
+            else
+            {
+                valid &= false;
+            }
+            return length;
         }
 
 #ifdef USE_ETL
