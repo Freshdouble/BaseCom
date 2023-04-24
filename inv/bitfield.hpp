@@ -2,6 +2,8 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
+#include <algorithm>
 
 #ifndef BITFIELD_HPP__
 #define BITFIELD_HPP__
@@ -138,7 +140,7 @@ namespace translib
         template <typename iterator>
         size_t BuildPacket(iterator &start, const iterator &end) const
         {
-            size_t length = min<size_t>(sizeof(storage), distance(start, end));
+            size_t length = std::min<size_t>(sizeof(storage), distance(start, end));
             std::memcpy(&(*start), storage, length);
             advance(start, length);
             return length;
