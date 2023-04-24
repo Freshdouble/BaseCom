@@ -13,7 +13,7 @@
 #ifndef COMPACKET_HPP__
 #define COMPACKET_HPP__
 
-#define USE_ETL
+//#define USE_ETL
 
 #ifdef USE_ETL
 #include "etl/string.h"
@@ -650,7 +650,7 @@ namespace translib
         template <const size_t maxdatalength>
         auto Unserialize(const std::array<uint8_t, maxdatalength> &data, size_t length)
         {
-            return Unserialize(data.begin(), data.end(), length, *this);
+            return Unserialize<maxdatalength>(data.begin(), data.end(), length, *this);
         }
 
     protected:
@@ -730,6 +730,50 @@ namespace translib
             assert(ret >= 0);
             return ret;
         }
+    };
+
+    template<const size_t idLength, class ...T>
+    class TagedComPacket : public ComPacket<T...>
+    {
+    public:
+    	TagedComPacket(const std::initializer_list<uint8_t>& id)
+    	{
+    		auto it = id.begin();
+    		for(size_t i = 0; i < std::min<size_t>(id.size(), idLength); i++)
+    		{
+    			this->id[i] = *it;
+    			it++;
+    		}
+    	}
+
+    	static constexpr size_t GetMaxSize()
+    	{
+    		return ComPacket<T...>::GetMaxSize() + idLength;
+    	}
+
+    	template<const size_t datalength>
+    	auto CheckIDMatch(const std::array<uint8_t, datalength> &data, size_t length) const
+    	{
+    		return CheckIDMatch(data, length, id);
+    	}
+
+    	/**
+    	* @brief Serialize the packet to the buffer with the specified id data before the serialized data.
+    	*
+    	* @tparam datalength
+    	* @tparam idlength
+    	* @param buffer
+    	* @param idbytes
+    	* @return size_t
+    	*/
+    	template <const size_t datalength>
+    	auto Serialize(array<uint8_t, datalength> &buffer) const
+    	{
+    		return ComPacket<T...>::template Serialize<datalength, idLength>(buffer, id);
+    	}
+
+    private:
+    	std::array<uint8_t, idLength> id;
     };
 }
 #endif
