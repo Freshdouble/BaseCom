@@ -17,6 +17,7 @@
 
 #ifdef USE_ETL
 #include "etl/string.h"
+#include "etl/vector.h"
 #endif
 
 using namespace std;
@@ -91,21 +92,21 @@ inline constexpr size_t getSerializedLength(const std::array<T, length> &data)
 }
 
 #ifdef USE_ETL
-        /**
-         * @brief Return the bytesize of the serialized packet.
-         *
-         * Template specialisation for etl::string.
-         * This returns the current length of the string plus one for the NULL terminator of the string.
-         *
-         * @tparam size_t MAX_SIZE_
-         * @param instance
-         * @return constexpr size_t
-         */
-        template <const size_t MAX_SIZE_>
-        inline constexpr size_t getSerializedLength(const etl::string<MAX_SIZE_> &instance)
-        {
-            return instance.length() + 1;
-        }
+/**
+ * @brief Return the bytesize of the serialized packet.
+ *
+ * Template specialisation for etl::string.
+ * This returns the current length of the string plus one for the NULL terminator of the string.
+ *
+ * @tparam size_t MAX_SIZE_
+ * @param instance
+ * @return constexpr size_t
+ */
+template<const size_t MAX_SIZE_>
+inline constexpr size_t getSerializedLength(const etl::string<MAX_SIZE_> &instance)
+{
+	return instance.length() + 1;
+}
 #endif
 
 /**
@@ -152,16 +153,16 @@ struct max_size<std::array<T, length>>
 };
 
 #ifdef USE_ETL
-        /**
-         * @brief Helper struct to calculate the size of an object at compile time.
-         *
-         * @tparam MAX_SIZE_
-         */
-        template <const size_t MAX_SIZE_>
-        struct max_size<etl::string<MAX_SIZE_>>
-        {
-            static const size_t value = etl::string<MAX_SIZE_>::MAX_SIZE + 1;
-        };
+/**
+ * @brief Helper struct to calculate the size of an object at compile time.
+ *
+ * @tparam MAX_SIZE_
+ */
+template<const size_t MAX_SIZE_>
+struct max_size<etl::string<MAX_SIZE_>>
+{
+	static const size_t value = etl::string<MAX_SIZE_>::MAX_SIZE + 1;
+};
 #endif
 
 /**
@@ -251,27 +252,27 @@ inline iterator serializeToBuffer(const std::array<arraytype, length> &data, ite
 }
 
 #ifdef USE_ETL
-        /**
-         * @brief Serialize object to buffer.
-         *
-         * @tparam MAX_SIZE_
-         * @tparam iterator
-         * @param data - Pointer to the data object to serialize.
-         * @param it - start iterator pointing to the next free space in the output buffer.
-         * @param end - end iterator marking the end of the output buffer.
-         * @return iterator
-         */
-        template <const size_t MAX_SIZE_, typename iterator>
-        inline iterator serializeToBuffer(const etl::string<MAX_SIZE_> &data, iterator &it, const iterator &end)
-        {
-        	auto dist = distance(it, end);
-        	assert(dist >= 0);
-            size_t typelength = min<size_t>(getSerializedLength(data), dist);
-            it = serializeToBuffer(data.c_str(), it, end, typelength - 1);
-            *it = 0;
-            it++;
-            return it;
-        }
+/**
+ * @brief Serialize object to buffer.
+ *
+ * @tparam MAX_SIZE_
+ * @tparam iterator
+ * @param data - Pointer to the data object to serialize.
+ * @param it - start iterator pointing to the next free space in the output buffer.
+ * @param end - end iterator marking the end of the output buffer.
+ * @return iterator
+ */
+template<const size_t MAX_SIZE_, typename iterator>
+inline iterator serializeToBuffer(const etl::string<MAX_SIZE_> &data, iterator &it, const iterator &end)
+{
+	auto dist = distance(it, end);
+	assert(dist >= 0);
+	size_t typelength = min<size_t>(getSerializedLength(data), dist);
+	it = serializeToBuffer(data.c_str(), it, end, typelength - 1);
+	*it = 0;
+	it++;
+	return it;
+}
 #endif
 
 /**
@@ -346,8 +347,7 @@ static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t len
 }
 
 template<typename T, size_t arraylength>
-static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length,
-		std::array<T, arraylength> &element, bool &valid)
+static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, std::array<T, arraylength> &element, bool &valid)
 {
 	auto byte_size = getSerializedLength(element);
 	size_t readbytes = 0;
@@ -367,30 +367,30 @@ static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t len
 }
 
 #ifdef USE_ETL
-        /**
-         * @brief Deserialize data from the buffer data to the object element.
-         *
-         * This function is to deserialize data to etl::string.
-         *
-         * @tparam MAX_SIZE_
-         * @param data - Buffer with serialzed data.
-         * @param length - Number of bytes in the buffer.
-         * @param element - The string to unserialize the data to.
-         * @param valid - Reference value is set to true if the data in element is considered valid. This is true if there are at least enough bytes in the buffer to fully fill the element.
-         * @return size_t
-         */
-        template <const size_t MAX_SIZE_>
-        size_t inline deserializeFromBuffer(const uint8_t *data, const size_t length, etl::string<MAX_SIZE_> &element, bool &valid)
-        {
-            (void)valid;
-            size_t stringlength = min<size_t>(strlen_s(reinterpret_cast<const char *>(data), length), MAX_SIZE_);
-            element = etl::string<MAX_SIZE_>(reinterpret_cast<const char *>(data), stringlength);
-            if (stringlength < length) // If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
-            {
-                stringlength++; // If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
-            }
-            return stringlength;
-        }
+/**
+ * @brief Deserialize data from the buffer data to the object element.
+ *
+ * This function is to deserialize data to etl::string.
+ *
+ * @tparam MAX_SIZE_
+ * @param data - Buffer with serialzed data.
+ * @param length - Number of bytes in the buffer.
+ * @param element - The string to unserialize the data to.
+ * @param valid - Reference value is set to true if the data in element is considered valid. This is true if there are at least enough bytes in the buffer to fully fill the element.
+ * @return size_t
+ */
+template<const size_t MAX_SIZE_>
+size_t inline deserializeFromBuffer(const uint8_t *data, const size_t length, etl::string<MAX_SIZE_> &element, bool &valid)
+{
+	(void) valid;
+	size_t stringlength = min<size_t>(strlen_s(reinterpret_cast<const char*>(data), length), MAX_SIZE_);
+	element = etl::string<MAX_SIZE_>(reinterpret_cast<const char*>(data), stringlength);
+	if (stringlength < length) // If we read the last bytes in the string no null terminator is needed for termination, so just return the number of read charakters.
+	{
+		stringlength++; // If the data is longer than the found string, a nullterminator was present in the string, so mark that as read.
+	}
+	return stringlength;
+}
 #endif
 
 /**
@@ -406,8 +406,7 @@ static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t len
  * @return size_t
  */
 template<const size_t bitlength>
-static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, Bitfield<bitlength> &element,
-		bool &valid)
+static inline size_t deserializeFromBuffer(const uint8_t *data, const size_t length, Bitfield<bitlength> &element, bool &valid)
 {
 	size_t ret = element.ParseData(data, length, valid);
 	return ret;
@@ -500,6 +499,33 @@ public:
 		return Serialize(it, buffer.end()) + idlength;
 	}
 
+	/**
+	 * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
+	 *
+	 * @tparam idlength
+	 * @param buffer
+	 * @param idbytes
+	 * @return size_t
+	 */
+	template<const size_t idlength>
+	size_t Serialize(etl::ivector<uint8_t> &buffer, const array<uint8_t, idlength> &idbytes) const
+	{
+		if constexpr (SupportsMaxSize)
+		{
+			assert(buffer.max_size() >= idlength + GetMaxSize());
+			if (!(buffer.max_size() >= idlength + GetMaxSize())) return 0;
+			buffer.resize(idlength + GetMaxSize());
+		}
+		else
+		{
+			assert(buffer.max_size() >= idlength + GetSerializedLength());
+			if (!(buffer.max_size() >= idlength + GetSerializedLength())) return 0;
+			buffer.resize(idlength + GetSerializedLength());
+		}
+		auto it = copy(idbytes.begin(), idbytes.end(), buffer.begin());
+		return Serialize(it, buffer.end()) + idlength;
+	}
+
 #ifdef USE_MEMALLOC
         /**
          * @brief Serialize the packet to the buffer with the specified id data before the serialized data.
@@ -514,11 +540,13 @@ public:
         {
             if constexpr (SupportsMaxSize)
             {
-                buffer.reserve(idlength + GetMaxSize());
+            	buffer.reserve(idlength + GetMaxSize());
+                buffer.resize(idlength + GetMaxSize());
             }
             else
             {
-                buffer.reserve(idlength + GetSerializedLength());
+            	buffer.reserve(idlength + GetSerializedLength());
+                buffer.resize(idlength + GetSerializedLength());
             }
             auto it = copy(idbytes.begin(), idbytes.end(), buffer.begin());
             return Serialize(it, buffer.end());
@@ -552,8 +580,7 @@ public:
 	 *  @return tuple<bool, iterator, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
 	 */
 	template<const size_t datalength, const size_t arraylength>
-	static tuple<bool, typename array<uint8_t, datalength>::const_iterator, size_t> CheckIDMatch(
-			const std::array<uint8_t, datalength> &data, size_t length, const array<uint8_t, arraylength> &idbytes)
+	static tuple<bool, typename array<uint8_t, datalength>::const_iterator, size_t> CheckIDMatch(const std::array<uint8_t, datalength> &data, size_t length, const array<uint8_t, arraylength> &idbytes)
 	{
 		assert(length <= datalength);
 		if (length <= datalength)
@@ -580,8 +607,7 @@ public:
 	 * @return a tuple which holds the number of read bytes as a size_t, a boolean that marks if the deserialized data could be valid and an iterator past the packet.
 	 */
 	template<const size_t maxdatalength>
-	static auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it,
-			const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length,
+	static auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it, const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length,
 			ComPacket<T...> &packet)
 	{
 		assert(length <= maxdatalength);
@@ -594,14 +620,11 @@ public:
 			auto parsed_elements = tupletype();
 			size_t offset = 0;
 			const uint8_t *data = &(*it);
-			bool valid =
-					apply(
-							[&offset, &data, length](
-									auto &&...args)
-									{
-										bool valid = true;
-										((offset += utils::deserializeFromBuffer(&data[offset], length - offset, args, valid)), ...);
-										return valid;}, parsed_elements);
+			bool valid = apply([&offset, &data, length](auto &&...args)
+			{
+				bool valid = true;
+				((offset += utils::deserializeFromBuffer(&data[offset], length - offset, args, valid)), ...);
+				return valid;}, parsed_elements);
 			if (valid)
 			{
 				packet.elements = parsed_elements;
@@ -639,8 +662,7 @@ public:
 	 * @return a tuple which holds the number of read bytes as a size_t and a boolean that marks if the deserialized data could be valid.
 	 */
 	template<const size_t maxdatalength>
-	auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it,
-			const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length)
+	auto Unserialize(typename std::array<uint8_t, maxdatalength>::const_iterator it, const typename std::array<uint8_t, maxdatalength>::const_iterator end, size_t length)
 	{
 		return Unserialize<maxdatalength>(it, end, length, *this);
 	}
@@ -676,8 +698,7 @@ protected:
 	 * @return tuple<bool, uint8_t*, size_t> If the packet start matches the id; The beginn of the data section; The remaining bytes in the packet.
 	 */
 	template<const size_t arraylength>
-	static tuple<bool, const uint8_t*, size_t> CheckIDMatch(const uint8_t *data, size_t datalength,
-			const array<uint8_t, arraylength> &idbytes)
+	static tuple<bool, const uint8_t*, size_t> CheckIDMatch(const uint8_t *data, size_t datalength, const array<uint8_t, arraylength> &idbytes)
 	{
 		if (datalength < arraylength)
 		{
@@ -807,6 +828,12 @@ public:
 	{
 		return ComPacket<T...>::template Serialize<datalength, idLength>(buffer, id);
 	}
+#ifdef USE_ETL
+	auto Serialize(etl::ivector<uint8_t> &buffer) const
+	{
+		return ComPacket<T...>::template Serialize<idLength>(buffer, id);
+	}
+#endif
 
 private:
 
